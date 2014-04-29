@@ -7,7 +7,7 @@ class dopassenger (
   $user = 'web',
   $group = 'www-data',
   $passenger_gems_path = $dopassenger::params::passenger_gems_path,
-  $tmp_dir = '/tmp/passenger',
+  $tmp_dir = '/var/tmp/passenger',
 
   # end of class arguments
   # ----------------------
