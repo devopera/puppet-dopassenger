@@ -147,7 +147,7 @@ class dopassenger (
     filename => $tmp_dir,
     user => $::apache::params::user,
     group => $group,
-    mode => 2660,
+    mode => 660,
     dirmode => 2770,
     groupfacl => 'rwx',
     recurse => true,
