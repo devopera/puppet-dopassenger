@@ -7,6 +7,7 @@ class dopassenger (
   $user = 'web',
   $group = 'www-data',
   $passenger_gems_path = $dopassenger::params::passenger_gems_path,
+  $passenger_gems_path_32 = $dopassenger::params::passenger_gems_path_32,
   $tmp_dir = '/var/tmp/passenger',
 
   # end of class arguments
@@ -26,6 +27,7 @@ class dopassenger (
       if ! defined(Package['ruby-devel']) {
         package { 'ruby-devel' :
           ensure => 'installed',
+          before => [Exec['dopassenger-apache2-symlink-latest-gems']],
         }
       }
       if ! defined(Package['libcurl-devel']) {
@@ -95,6 +97,7 @@ class dopassenger (
       if ! defined(Package['ruby-dev']) {
         package { 'ruby-dev' :
           ensure => 'installed',
+          before => [Exec['dopassenger-apache2-symlink-latest-gems']],
         }
       }
       # install passenger gem
@@ -112,25 +115,26 @@ class dopassenger (
     }
   }
 
+  # create symlink 'latest-gems' for vhost configs
+  exec { 'dopassenger-apache2-symlink-latest-gems' :
+    path => '/bin:/usr/bin:/sbin:/usr/sbin',
+    command => "ln -fs ${passenger_gems_path} /usr/lib/ruby/latest-gems",
+  }
+
   # install apache2 module
   exec { 'dopassenger-apache2-install-module' :
     path => '/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin',
     command => 'passenger-install-apache2-module --auto',
     # it's actually the symlink that creates this, but it's a useful proxy
     creates => "${passenger_gems_path}/latest-passenger",
+    require => [Exec['dopassenger-apache2-symlink-latest-gems']],
   }->
 
-  # create symlink 'latest-gems' for vhost configs
-  exec { 'dopassenger-apache2-symlink-latest-gems' :
-    path => '/bin:/usr/bin:/sbin:/usr/sbin',
-    command => "ln -fs ${passenger_gems_path} /usr/lib/ruby/latest-gems",
-  }->
-
-  # create symlink 'latest-passenger' for vhost configs
+  # create symlink 'latest-passenger' for vhost configs in non-64-only directory
   # together these two symlinks give us a cross-platform /usr/lib/ruby/latest-gems/latest-passenger/mod_passenger.so
   exec { 'dopassenger-apache2-symlink-latest-passenger' :
     path => '/bin:/usr/bin:/sbin:/usr/sbin',
-    command => "find ${passenger_gems_path}/ -name 'passenger-*' -exec ln -fs {} ${passenger_gems_path}/latest-passenger \;",
+    command => "find ${passenger_gems_path}/ -name 'passenger-*' -exec ln -fs {} ${passenger_gems_path_32}/latest-passenger \;",
   }
 
   # selinux
