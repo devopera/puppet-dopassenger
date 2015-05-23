@@ -6,8 +6,11 @@ class dopassenger (
 
   $user = 'web',
   $group = 'www-data',
-  $passenger_gems_path = $dopassenger::params::passenger_gems_path,
-  $passenger_gems_path_32 = $dopassenger::params::passenger_gems_path_32,
+
+  $ruby_version = 'ruby-1.9',
+  $passenger_version = '4.0.59',
+
+  $rvm_path = '/usr/local/rvm',
   $tmp_dir = '/var/tmp/passenger',
 
   # end of class arguments
@@ -17,131 +20,55 @@ class dopassenger (
 ) inherits dopassenger::params {
 
   # install passenger deps
-  case $operatingsystem {
-    centos, redhat: {
-      if ! defined(Package['gcc-c++']) {
-        package { 'gcc-c++' : 
-          ensure => 'installed',
-        }
-      }
-      if ! defined(Package['ruby-devel']) {
-        package { 'ruby-devel' :
-          ensure => 'installed',
-          before => [Exec['dopassenger-apache2-symlink-latest-gems']],
-        }
-      }
-      if ! defined(Package['libcurl-devel']) {
-        package { 'libcurl-devel' :
-          ensure => 'installed',
-        }
-      }
-      if ! defined(Package['httpd-devel']) {
-        package { 'httpd-devel' :
-          ensure => 'installed',
-        }
-      }
-      if ! defined(Package['apr-devel']) {
-        package { 'apr-devel' :
-          ensure => 'installed',
-        }
-      }
-      if ! defined(Package['apr-util-devel']) {
-        package { 'apr-util-devel' :
-          ensure => 'installed',
-        }
-      }
-      if ! defined(Package['openssl-devel']) {
-        package { 'openssl-devel' :
-          ensure => 'installed',
-        }
-      }
-      if ! defined(Package['zlib-devel']) {
-        package { 'zlib-devel' :
-          ensure => 'installed',
-        }
-      }
-      # install passenger gem
-      if ! defined(Package['passenger']) {
-        package { 'passenger' :
-          ensure => 'installed',
-          provider => 'gem',
-          require => [Package['gcc-c++'], Package['ruby-devel'], Package['libcurl-devel'], Package['httpd-devel'], Package['apr-devel'], Package['apr-util-devel'], Package['openssl-devel'], Package['zlib-devel'],],
-        }
-      }
-      Exec <| title == 'dopassenger-apache2-install-module' |> {
-        # require Passenger and also any packages potentially already defined elsewhere
-        require => [Package['passenger'], Package['gcc-c++'], Package['ruby-devel'], Package['libcurl-devel'], Package['httpd-devel'], Package['apr-devel'], Package['apr-util-devel'], Package['openssl-devel'], Package['zlib-devel']],
-      }
-    }
-    ubuntu, debian: {
-      if ! defined(Package['libcurl4-openssl-dev']) {
-        package { 'libcurl4-openssl-dev' :
-          ensure => 'installed',
-        }
-      }
-      if ! defined(Package['apache2-threaded-dev']) {
-        package { 'apache2-threaded-dev' :
-          ensure => 'installed',
-        }
-      }
-      if ! defined(Package['libapr1-dev']) {
-        package { 'libapr1-dev' :
-          ensure => 'installed',
-        }
-      }
-      if ! defined(Package['libaprutil1-dev']) {
-        package { 'libaprutil1-dev' :
-          ensure => 'installed',
-        }
-      }
-      if ! defined(Package['ruby-dev']) {
-        package { 'ruby-dev' :
-          ensure => 'installed',
-          before => [Exec['dopassenger-apache2-symlink-latest-gems']],
-        }
-      }
-      # install passenger gem
-      if ! defined(Package['passenger']) {
-        package { 'passenger' :
-          ensure => 'installed',
-          provider => 'gem',
-          require => [Package['libcurl4-openssl-dev'], Package['apache2-threaded-dev'], Package['libapr1-dev'], Package['libaprutil1-dev'], Package['ruby-dev']],
-        }
-      }
-      Exec <| title == 'dopassenger-apache2-install-module' |> {
-        # require Passenger and also any packages potentially already defined elsewhere
-        require => [Package['passenger'], Package['libcurl4-openssl-dev'], Package['apache2-threaded-dev'], Package['libapr1-dev'], Package['libaprutil1-dev'], Package['ruby-dev']],
-      }
-    }
+  class { 'dopassenger::systemprep' : }
+
+  class { 'rvm' :
+    require => [Class['dopassenger::systemprep']],
+  }
+  rvm_system_ruby { $ruby_version :
+    ensure      => 'present',
+    default_use => false,
+  }
+  rvm_system_ruby { 'ruby-2.2' :
+    ensure      => 'present',
+    default_use => false,
+  }
+  rvm_gem { 'rails':
+    ensure       => 'present',
+    ruby_version => $ruby_version,
+    require      => Rvm_system_ruby[$ruby_version],
+  }
+  class { 'rvm::passenger::gem':
+    ruby_version => $ruby_version,
+    version      => $passenger_version,
+  }
+  exec { 'passenger-install-apache2-module':
+    path        => "${rvm_path}/bin:/usr/bin:/bin:/usr/sbin:/sbin:",
+    command     => "rvm ${ruby_version} exec passenger-install-apache2-module -a",
+    environment => [ 'HOME=/root', ],
+    # @todo sensible creates so we don't install it everytime
+    # creates     => $modobjectpath,
+    require     => Class['rvm::passenger::gem'],
   }
 
-  # create symlink 'latest-gems' for vhost configs
+  # create symlink 'ruby-master' for vhost configs
   exec { 'dopassenger-apache2-symlink-latest-gems' :
     path => '/bin:/usr/bin:/sbin:/usr/sbin',
-    command => "ln -fs ${passenger_gems_path} /usr/lib/ruby/latest-gems",
-  }
-
-  # install apache2 module
-  exec { 'dopassenger-apache2-install-module' :
-    path => '/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin',
-    command => 'passenger-install-apache2-module --auto',
-    # it's actually the symlink that creates this, but it's a useful proxy
-    creates => "${passenger_gems_path}/latest-passenger",
-    require => [Exec['dopassenger-apache2-symlink-latest-gems']],
+    # find name of latest ruby that started ruby-1.9 and doesn't finish @global
+    command => "find ${rvm_path}/gems/ -name '${ruby_version}.[[:digit:]]*-p[[:digit:]]*' ! -name '*\@global' -exec ln -fs {} ${rvm_path}/gems/ruby-master \;",
   }->
 
-  # create symlink 'latest-passenger' for vhost configs in non-64-only directory
-  # together these two symlinks give us a cross-platform /usr/lib/ruby/latest-gems/latest-passenger/mod_passenger.so
+  # create symlink 'latest-passenger' for vhost configs
   exec { 'dopassenger-apache2-symlink-latest-passenger' :
     path => '/bin:/usr/bin:/sbin:/usr/sbin',
-    command => "find ${passenger_gems_path}/ -name 'passenger-*' -exec ln -fs {} ${passenger_gems_path_32}/latest-passenger \;",
+    command => "find ${rvm_path}/gems/ruby-master/gems/ -name 'passenger-*' -exec ln -fs {} ${rvm_path}/gems/ruby-master/gems/passenger-master \;",
   }
 
   # selinux
   if (str2bool($::selinux)) {
     # allow access to gems
     docommon::setcontext { 'dopassenger-selinux-gem-context' :
-      filename => "${passenger_gems_path}/latest-passenger",
+      filename => "${rvm_path}/gems/ruby-master/gems/passenger-master",
       context => 'httpd_sys_content_t',
       require => Exec['dopassenger-apache2-symlink-latest-passenger'],
     }

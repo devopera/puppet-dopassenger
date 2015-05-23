@@ -1,0 +1,14 @@
+{
+  "name": "devopera-dopassenger",
+  "version": "0.9.0",
+  "author": "(c) Alex Stanhope, Devopera.com",
+  "summary": "Passenger installation and configuration module",
+  "license": "Apache License, Version 2.0",
+  "source": "https://github.com/devopera/puppet-dopassenger",
+  "project_page": "http://devopera.com/module/dopassenger",
+  "description": "",
+  "issues_url": "https://github.com/devopera/puppet-dopassenger/issues",
+  "dependencies": [
+    {"name":"maestrodev/apt","version_requirement":"0.9.3"}
+  ]
+}
