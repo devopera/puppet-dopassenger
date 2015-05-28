@@ -42,6 +42,13 @@ class dopassenger (
     ruby_version => $ruby_version,
     version      => $passenger_version,
   }
+  # don't allow ruby installs to mess with system
+  exec { 'passenger-ruby-default-system' :
+    path        => "${rvm_path}/bin:/usr/bin:/bin:/usr/sbin:/sbin:",
+    command     => 'rvm --default use system', 
+    require     => Class['rvm::passenger::gem'],
+  }
+
   exec { 'passenger-install-apache2-module':
     path        => "${rvm_path}/bin:/usr/bin:/bin:/usr/sbin:/sbin:",
     command     => "rvm ${ruby_version} exec passenger-install-apache2-module -a",
