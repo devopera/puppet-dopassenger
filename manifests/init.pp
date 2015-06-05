@@ -85,6 +85,15 @@ class dopassenger (
       context => 'httpd_sys_content_t',
       require => Exec['dopassenger-apache2-symlink-latest-passenger'],
     }
+    # load passenger selinux module
+    selinux::module { 'dopassenger-selinux-passenger':
+      ensure => 'present',
+      source => 'puppet:///modules/dopassenger/passenger.te',
+    }
+    selinux::module { 'dopassenger-selinux-rubysockets':
+      ensure => 'present',
+      source => 'puppet:///modules/dopassenger/rubysockets.te',
+    }
   }
   # create a writeable temporary directory
   docommon::stickydir { 'dopassenger-tmpdir' :
