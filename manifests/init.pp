@@ -46,13 +46,13 @@ class dopassenger (
   exec { 'passenger-ruby-default-system' :
     path        => "${rvm_path}/bin:/usr/bin:/bin:/usr/sbin:/sbin:",
     command     => 'rvm --default use system', 
-    require     => Class['rvm::passenger::gem'],
+    require     => [Class['rvm'], Class['rvm::passenger::gem']],
   }
   exec { "passenger-ruby-default-system-${user}" :
     path        => "${rvm_path}/bin:/usr/bin:/bin:/usr/sbin:/sbin:",
     command     => 'rvm --default use system', 
     user        => $user,
-    require     => Class['rvm::passenger::gem'],
+    require     => [Class['rvm'], Class['rvm::passenger::gem']],
   }
 
   exec { 'passenger-install-apache2-module':
@@ -61,7 +61,7 @@ class dopassenger (
     environment => [ 'HOME=/root', ],
     # @todo sensible creates so we don't install it everytime
     # creates     => $modobjectpath,
-    require     => Class['rvm::passenger::gem'],
+    require     => [Class['rvm'], Class['rvm::passenger::gem']],
   }
 
   # create symlink 'ruby-master' for vhost configs
